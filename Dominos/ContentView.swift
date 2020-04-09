@@ -14,14 +14,13 @@ enum DragState {
 }
 
 struct Fonts {
-    static func sanFranciscoDisplayBold (size:CGFloat) -> Font{
-        return Font.custom("SanFranciscoDisplay-Bold",size: size)
+    static func zapfino (size:CGFloat) -> Font{
+        return Font.custom("Zapfino",size: size)
     }
 }
 
 struct ContentView: View {
-  @State var flipped = false
-
+  @State var magnificationValue: CGFloat = CGFloat(1)
   
   var body: some View {
     let screenSize = UIScreen.main.bounds
@@ -34,9 +33,16 @@ struct ContentView: View {
           Rectangle()
             .fill(Color.yellow)
             .frame(minWidth: screenWidth * 4, maxHeight: screenHeight * 0.6)
+//            .gesture(MagnificationGesture()
+//            .onChanged { value in
+//            self.magnificationValue = value
+//            })
+//            .scaleEffect(magnificationValue)
           Text("Dominos with Better Programming")
-            .font(Fonts.sanFranciscoDisplayBold(size: 128))
+            .font(Fonts.zapfino(size: 128))
             .opacity(0.2)
+          }.onAppear {
+            allocateImages()
           }
         }
         HStack {
@@ -73,6 +79,7 @@ struct DominoWrapper: View {
       Domino(highImage: highImage, lowImage: lowImage, spin: xpin).onAppear {
         withAnimation(Animation.easeInOut(duration: 1.5).delay(0)) {
           self.xpin = 0
+          self.hideBack = true
         }
       }.rotation3DEffect(.degrees(xpin), axis: (x: 0, y: 1, z: 0))
         .gesture(LongPressGesture()
@@ -154,7 +161,7 @@ struct Back: View {
         }
     ).overlay(RoundedRectangle(cornerRadius: 8)
           .stroke(lineWidth: 2))
-          .rotation3DEffect(.degrees(spin), axis: (x: 0, y: 1, z: 0))
+          
   }
 }
 
@@ -164,4 +171,29 @@ struct ContentView_Previews: PreviewProvider {
   }
 }
 
+func allocateImages() {
+  var primaryImages:Set<String> = ["image_part_002","image_part_003","image_part_004","image_part_005","image_part_006"]
+  var secondaryImages:Set<String> = []
+  var tiles:Set<String> = []
+  
+    let elementA = primaryImages.randomElement()
+    primaryImages.remove(elementA!)
+    let elementB = primaryImages.randomElement()
+    primaryImages.remove(elementB!)
+    tiles.insert(elementA! + ":" + elementB!)
+    secondaryImages.insert(elementA!)
+    secondaryImages.insert(elementB!)
+  repeat {
+    let elementC = primaryImages.randomElement()
+    primaryImages.remove(elementC!)
+    secondaryImages.insert(elementC!)
+    let elementD = secondaryImages.randomElement()
+    secondaryImages.remove(elementD!)
+    tiles.insert(elementC! + ":" + elementD!)
+  } while !primaryImages.isEmpty
+    let elementE = secondaryImages.removeFirst()
+    let elementF = secondaryImages.randomElement()
+    tiles.insert(elementE + ":" + elementF!)
+  print("tiles ",tiles,secondaryImages.count)
+}
 
