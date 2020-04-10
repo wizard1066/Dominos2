@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 50;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,7 @@
 		7B0FB6F0243CE9830023B0B5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B0FB6EF243CE9830023B0B5 /* Assets.xcassets */; };
 		7B0FB6F3243CE9830023B0B5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B0FB6F2243CE9830023B0B5 /* Preview Assets.xcassets */; };
 		7B0FB6F6243CE9830023B0B5 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7B0FB6F4243CE9830023B0B5 /* LaunchScreen.storyboard */; };
+		7B0FB6FF2440C7930023B0B5 /* Introspect in Frameworks */ = {isa = PBXBuildFile; productRef = 7B0FB6FE2440C7930023B0B5 /* Introspect */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0FB6FF2440C7930023B0B5 /* Introspect in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +93,9 @@
 			dependencies = (
 			);
 			name = Dominos;
+			packageProductDependencies = (
+				7B0FB6FE2440C7930023B0B5 /* Introspect */,
+			);
 			productName = Dominos;
 			productReference = 7B0FB6E6243CE9800023B0B5 /* Dominos.app */;
 			productType = "com.apple.product-type.application";
@@ -119,6 +124,9 @@
 				Base,
 			);
 			mainGroup = 7B0FB6DD243CE9800023B0B5;
+			packageReferences = (
+				7B0FB6FD2440C7930023B0B5 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */,
+			);
 			productRefGroup = 7B0FB6E7243CE9800023B0B5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -342,6 +350,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7B0FB6FD2440C7930023B0B5 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/timbersoftware/SwiftUI-Introspect.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7B0FB6FE2440C7930023B0B5 /* Introspect */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B0FB6FD2440C7930023B0B5 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */;
+			productName = Introspect;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7B0FB6DE243CE9800023B0B5 /* Project object */;
 }
