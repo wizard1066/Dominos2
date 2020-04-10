@@ -24,7 +24,7 @@ class newViews: ObservableObject {
   @Published var nouViews: [newView]
   
   init() {
-    self.nouViews = allocateImages()
+    self.nouViews = allocateImagesV()
   }
 }
 
@@ -58,7 +58,7 @@ struct ContentView: View {
             DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0)
           }
 //          ZStack {
-            ForEach((7 ..< 35), id: \.self) { column in
+            ForEach((6 ..< 33), id: \.self) { column in
               DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0)
             }
 //          }
@@ -79,24 +79,25 @@ struct DominoWrapper: View {
   @State var accumulated = CGSize.zero
   @State var rotateAngle:Double = 0
   @State var hideBack = false
+  @State var magnificationEffect: CGFloat = 1
   
   var body: some View {
    
     return Group { ZStack {
       Back(spin: -spin).onTapGesture {
-        withAnimation(Animation.easeInOut(duration: 1.5).delay(0)) {
+        withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
           self.spin = 180
         }
       }.rotation3DEffect(.degrees(spin), axis: (x: 0, y: 1, z: 0))
         .opacity(hideBack ? 0:1)
-      if self.spin == 180 {
+      if self.spin > 175 {
         Domino(spin: $xpin, novelleViews: novelleViews, index: $column).onAppear {
-          withAnimation(Animation.easeInOut(duration: 1.5).delay(0)) {
+          withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
             self.xpin = 0
             self.hideBack = true
           }
         }.rotation3DEffect(.degrees(xpin), axis: (x: 0, y: 1, z: 0))
-          .gesture(LongPressGesture()
+          .gesture(TapGesture(count: 2)
             .onEnded({ (_) in
               withAnimation {
                 if self.rotateAngle < 360 {
@@ -115,15 +116,16 @@ struct DominoWrapper: View {
       .gesture(DragGesture(coordinateSpace: .global)
         .onChanged({ ( value ) in
           self.dragOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
-          self.hideBack = true
         })
         .onEnded { ( value ) in
           self.dragOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
           self.accumulated = self.dragOffset
         }
-    ).onAppear {
-      print("col ", self.column)
-      }
+    ).scaleEffect(magnificationEffect, anchor: .center)
+    .gesture(MagnificationGesture()
+    .onChanged { value in
+      self.magnificationEffect = value
+    })
     }
   }
 }
@@ -188,6 +190,44 @@ struct ContentView_Previews: PreviewProvider {
   }
 }
 
+func allocateImagesV() -> [newView] {
+  var primaryImages:Set<String> = []
+  var secondaryImages:Set<String> = []
+  var tiles:Set<String> = []
+  
+  
+  
+for _ in 0..<2 {
+  for build in 2..<36 {
+    primaryImages.insert(String(format: "image_part_%03d",build))
+    print(String(format: "image_part_%03d",build))
+  }
+  repeat {
+    let elementA = primaryImages.randomElement()
+    primaryImages.remove(elementA!)
+    let elementB = primaryImages.randomElement()
+    primaryImages.remove(elementB!)
+    tiles.insert(elementA! + ":" + elementB!)
+    secondaryImages.insert(elementA!)
+    secondaryImages.insert(elementB!)
+  } while !primaryImages.isEmpty
+  }
+  
+  var answer:[newView] = []
+  for tile in tiles {
+    var highImage:String!
+    var lowImage:String!
+    let images = tile.split(separator: ":").map(String.init)
+      if images != [] {
+        highImage = images[0]
+        lowImage = images[1]
+      }
+    let tileView = newView(id: nil, highImage: highImage, lowImage: lowImage)
+    answer.append(tileView)
+  }
+  return answer
+}
+
 func allocateImages() -> [newView] {
   var primaryImages:Set<String> = []
   var secondaryImages:Set<String> = []
@@ -202,9 +242,7 @@ func allocateImages() -> [newView] {
   primaryImages.remove(elementA!)
   let elementB = primaryImages.randomElement()
   primaryImages.remove(elementB!)
-  if elementA == elementB {
-    print("fuck A ************")
-  }
+
   tiles.insert(elementA! + ":" + elementB!)
   secondaryImages.insert(elementA!)
   secondaryImages.insert(elementB!)
@@ -214,9 +252,7 @@ func allocateImages() -> [newView] {
     let elementD = secondaryImages.randomElement()
     secondaryImages.remove(elementD!)
     secondaryImages.insert(elementC!)
-    if elementC == elementD {
-    print("fuck B ************")
-    }
+
     tiles.insert(elementC! + ":" + elementD!)
   } while !primaryImages.isEmpty
   let elementE = secondaryImages.removeFirst()
