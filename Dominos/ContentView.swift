@@ -10,12 +10,16 @@ import SwiftUI
 import Combine
 import Introspect
 
-let rotateImagePublisher = PassthroughSubject<Int, Never>()
+let rotateDominoPublisher = PassthroughSubject<Int, Never>()
+let flipDominoPublisher = PassthroughSubject<(Int,Double), Never>()
+let resetPublisher = PassthroughSubject<Void, Never>()
 
 enum DragState {
   case inactive
   case dragging(translation: CGSize)
 }
+
+
 
 struct newView:Identifiable {
   var id:UUID? = UUID()
@@ -27,7 +31,7 @@ class newViews: ObservableObject {
   @Published var nouViews: [newView] {
     // force change when array contents change with willSet
     willSet {
-        objectWillChange.send()
+      objectWillChange.send()
     }
   }
   
@@ -45,16 +49,38 @@ struct Fonts {
 struct ContentView: View {
   @ObservedObject var novelleViews = newViews()
   @State var disableScrollView = false
-  @State var fudge = true
+  @State var fudge = 0
+  @State var fudgeOffset = CGSize.zero
+  @State var accumulated = CGSize.zero
+  @State private var rect:[CGRect] = []
   
+ 
   
   var body: some View {
     let screenSize = UIScreen.main.bounds
     let screenWidth = screenSize.width
     let screenHeight = screenSize.height
     return VStack {
-      ScrollView(Axis.Set.horizontal, showsIndicators: true)
-      {
+      //      ScrollView(Axis.Set.horizontal, showsIndicators: true) {
+      VStack {
+        HStack {
+          Button(action: {
+            withAnimation {
+              self.fudge += 100
+            }
+          }) {
+            Text("Left")
+          }
+          
+          Button(action: {
+            withAnimation {
+              self.fudge -= 100
+            }
+          }) {
+            Text("Right")
+          }
+        }.offset(CGSize(width: -self.fudge, height: 0))
+        
         VStack {
           ZStack {
             Rectangle()
@@ -63,31 +89,41 @@ struct ContentView: View {
             Text("Dominos with Better Programming")
               .font(Fonts.zapfino(size: 128))
               .opacity(0.2)
-//              .onLongPressGesture {
-//                self.fudge = []
-//                print("fuck")
-//              }
           }.onAppear {
             // emulate network code
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(16)) {
-//                self.novelleViews.nouViews = allocateImages()
+              //                self.novelleViews.nouViews = allocateImages()
             }
           }
         }
         HStack {
-          ForEach((0 ..< 68), id: \.self) { column in
-            DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0)
+//          ForEach((0 ..< 68), id: \.self) { column in
+          ForEach((0 ..< 26), id: \.self) { column in
+            DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0, rect: self.$rect)
           }
-//          ZStack {
-//            ForEach((6 ..< 67), id: \.self) { column in
-//              DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0)
-//            }
-//          }
+          // ZStack {
+          //            ForEach((6 ..< 67), id: \.self) { column in
+          //              DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0)
+          //            }
+          //          }
         }
+        //      } // ScrollView
+      }.offset(CGSize(width: fudge, height: 0))
+        .offset(fudgeOffset)
+        .gesture(DragGesture(coordinateSpace: .global)
+          .onChanged({ ( value ) in
+            self.fudgeOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
+          })
+          .onEnded { ( value ) in
+            self.fudgeOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
+            self.accumulated = self.fudgeOffset
+          }
+      ) // VStack
+    }.onReceive(resetPublisher) { (_) in
+      for dominos in self.novelleViews.nouViews {
+        
       }
-      
-      }
-    
+    }
   }
 }
 
@@ -102,10 +138,12 @@ struct DominoWrapper: View {
   @State var hideBack = false
   @State var magnificationEffect: CGFloat = 1
   @State var flipper:Double = 0
-  @State var zIndex:Double = 0
+  @Binding var rect:[CGRect]
+  @GestureState private var dragState = DragState.inactive
+
   
   var body: some View {
-   
+    
     return Group { ZStack {
       Back(spin: -spin).onTapGesture {
         withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
@@ -113,11 +151,14 @@ struct DominoWrapper: View {
         }
       }
       .rotation3DEffect(.degrees(spin), axis: (x: 0, y: 1, z: 0))
-        .opacity(hideBack ? 0.1:1)
-        .rotationEffect(.degrees(self.rotateAngle), anchor: .center)
-        
+      .opacity(hideBack ? 0.1:1)
+      .rotationEffect(.degrees(self.rotateAngle), anchor: .center)
+      
+      
       if self.spin > 179 {
-        Domino(spin: $xpin, novelleViews: novelleViews, index: $column, flipper: $flipper).onAppear {
+        Domino(spin: $xpin, novelleViews: novelleViews, index: $column, flipper: $flipper)
+        .background(InsideView(rect: $rect))
+        .onAppear {
           withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
             self.xpin = 0
           }
@@ -136,33 +177,66 @@ struct DominoWrapper: View {
                   self.flipper = 0
                 }
                 print("rotateAngle ",self.rotateAngle)
-                self.zIndex = 10
               }
               }
             )
-        ).rotationEffect(.degrees(self.rotateAngle), anchor: .center)
+        ).onReceive(flipDominoPublisher, perform: { ( tupple ) in
+                let (domino,direction) = tupple
+                if domino == self.$column.wrappedValue {
+                withAnimation {
+                if self.rotateAngle < 360 {
+                  self.rotateAngle += direction
+                  self.flipper -= direction
+                } else {
+                  self.rotateAngle = 0
+                  self.flipper = 0
+                }
+                print("rotateAngle ",self.rotateAngle)
+              }
+              }
+        })
+        .onReceive(rotateDominoPublisher, perform: { ( domino ) in
+                print("domino ",domino,self.$column.wrappedValue)
+                if domino == self.$column.wrappedValue {
+                withAnimation {
+                if self.rotateAngle < 360 {
+                  self.rotateAngle += 180
+                  self.flipper -= 180
+                } else {
+                  self.rotateAngle = 0
+                  self.flipper = 0
+                }
+                print("rotateAngle ",self.rotateAngle)
+              }
+              }
+        })
+        .rotationEffect(.degrees(self.rotateAngle), anchor: .center)
       }
       
     }.offset(x: self.dragOffset.width, y: self.dragOffset.height)
       .gesture(DragGesture(coordinateSpace: .global)
+        .updating($dragState, body: {dragValue, state, transaction in
+//          print("details ",dragValue,state,transaction)
+        })
         .onChanged({ ( value ) in
           self.dragOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
         })
         .onEnded { ( value ) in
           self.dragOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
           self.accumulated = self.dragOffset
+          print("fuck ",self.column,self.novelleViews.nouViews[self.column].id, self.novelleViews.nouViews[self.column].highImage,self.novelleViews.nouViews[self.column].lowImage)
         }
-    )
-// .scaleEffect(magnificationEffect, anchor: .center)
-//    .onLongPressGesture {
-//        withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
-//          self.magnificationEffect = 2.0
-//        }
-//      }
-//    .gesture(MagnificationGesture()
-//    .onChanged { value in
-//      self.magnificationEffect = value
-//    })
+      )
+      // .scaleEffect(magnificationEffect, anchor: .center)
+      //    .onLongPressGesture {
+      //        withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
+      //          self.magnificationEffect = 2.0
+      //        }
+      //      }
+      //    .gesture(MagnificationGesture()
+      //    .onChanged { value in
+      //      self.magnificationEffect = value
+      //    })
     }
   }
 }
@@ -174,6 +248,7 @@ struct Domino: View {
   @State var rotateAngle: Double = 0
   @Binding var flipper: Double
   
+  
   var body: some View {
     return Rectangle()
       .fill(Color.clear)
@@ -184,22 +259,40 @@ struct Domino: View {
             .resizable()
             .frame(width: 32, height: 32, alignment: .top)
             .padding(4)
-            
             .rotationEffect(.degrees(flipper), anchor: .center)
+            .onTapGesture(count: 2) {
+              flipDominoPublisher.send((self.index, 90))
+            }
+            .gesture(LongPressGesture()
+              .onEnded({ (_) in
+              rotateDominoPublisher.send(self.index)
+            }
+          ))
+        
+          
           Divider()
             .frame(width: 24, height: 2, alignment: .center)
           Image(self.novelleViews.nouViews[index].lowImage)
             .resizable()
             .frame(width: 32, height: 32, alignment: .bottom)
             .padding(4)
-            
             .rotationEffect(.degrees(flipper), anchor: .center)
+            .onTapGesture(count: 2) {
+              print("poo")
+              flipDominoPublisher.send((self.index, -90))
+            }
+            .gesture(LongPressGesture()
+              .onEnded({ (_) in
+                rotateDominoPublisher.send(self.index)
+                
+                }
+              )
+          )
+          
         }
     ).overlay(RoundedRectangle(cornerRadius: 8)
       .stroke(lineWidth: 2))
-      
-      
-      
+      .accessibility(identifier: String(self.index))
   }
 }
 
@@ -229,6 +322,25 @@ struct Back: View {
   }
 }
 
+var runOnce = true
+
+struct InsideView: View {
+  @Binding var rect: [CGRect]
+  var body: some View {
+      return VStack {
+         GeometryReader { geometry in
+          Rectangle()
+            .fill(Color.clear)
+            .onAppear {
+              if runOnce {
+                self.rect.append(geometry.frame(in: .global))
+              }
+          }
+        }
+    }
+  }
+}
+
 struct ContentView_Previews: PreviewProvider {
   static var previews: some View {
     ContentView(novelleViews: newViews.init())
@@ -244,17 +356,17 @@ func allocateImagesV() -> [newView] {
   
   
   for _ in 0..<2 {
-    for build in 2..<37 {
-//      primaryImages.insert(String(format: "Image-%d",build))
-//      secondaryImages.insert(String(format: "Image-%d",build))
-      primaryImages.insert(String(format: "image_part_%03d",build))
-      secondaryImages.insert(String(format: "image_part_%03d",build))
+    for build in 2..<16 {
+            primaryImages.insert(String(format: "Image-%d",build))
+            secondaryImages.insert(String(format: "Image-%d",build))
+//      primaryImages.insert(String(format: "image_part_%03d",build))
+//      secondaryImages.insert(String(format: "image_part_%03d",build))
       print(String(format: "image_part_%d",build))
     }
     repeat {
-    
+      
       let elementA = primaryImages.removeFirst()
-//      primaryImages.remove(elementA)
+      //      primaryImages.remove(elementA)
       
       let elementB = secondaryImages.randomElement()
       secondaryImages.remove(elementB!)
@@ -274,11 +386,11 @@ func allocateImagesV() -> [newView] {
     var highImage:String!
     var lowImage:String!
     let images = tile.split(separator: ":").map(String.init)
-      if images != [] {
-        highImage = images[0]
-        lowImage = images[1]
-      }
-    let tileView = newView(id: nil, highImage: highImage, lowImage: lowImage)
+    if images != [] {
+      highImage = images[0]
+      lowImage = images[1]
+    }
+    let tileView = newView(highImage: highImage, lowImage: lowImage)
     answer.append(tileView)
   }
   return answer
@@ -299,7 +411,7 @@ func allocateImages() -> [newView] {
   primaryImages.remove(elementA!)
   let elementB = primaryImages.randomElement()
   primaryImages.remove(elementB!)
-
+  
   tiles.insert(elementA! + ":" + elementB!)
   secondaryImages.insert(elementA!)
   secondaryImages.insert(elementB!)
@@ -309,7 +421,7 @@ func allocateImages() -> [newView] {
     let elementD = secondaryImages.randomElement()
     secondaryImages.remove(elementD!)
     secondaryImages.insert(elementC!)
-
+    
     tiles.insert(elementC! + ":" + elementD!)
   } while !primaryImages.isEmpty
   let elementE = secondaryImages.removeFirst()
@@ -322,13 +434,21 @@ func allocateImages() -> [newView] {
     var highImage:String!
     var lowImage:String!
     let images = tile.split(separator: ":").map(String.init)
-      if images != [] {
-        highImage = images[0]
-        lowImage = images[1]
-      }
+    if images != [] {
+      highImage = images[0]
+      lowImage = images[1]
+    }
     let tileView = newView(id: nil, highImage: highImage, lowImage: lowImage)
     answer.append(tileView)
   }
   return answer
 }
 
+extension UIWindow {
+  open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+    if motion == .motionShake {
+//      print("Device shaken")
+      resetPublisher.send()
+    }
+  }
+}
