@@ -13,6 +13,7 @@ import Introspect
 let rotateDominoPublisher = PassthroughSubject<Int, Never>()
 let flipDominoPublisher = PassthroughSubject<(Int,Double), Never>()
 let resetPublisher = PassthroughSubject<Void, Never>()
+let setTilesPublisher = PassthroughSubject<Int, Never>()
 
 enum DragState {
   case inactive
@@ -25,6 +26,9 @@ struct newView:Identifiable {
   var id:UUID? = UUID()
   var highImage:String = ""
   var lowImage:String = ""
+  var rect:CGRect?
+  var point:CGPoint = CGPoint(x: 0, y: 0)
+  var offset:CGSize = CGSize.zero
 }
 
 class newViews: ObservableObject {
@@ -53,7 +57,7 @@ struct ContentView: View {
   @State var fudgeOffset = CGSize.zero
   @State var accumulated = CGSize.zero
   @State private var rect:[CGRect] = []
-  
+  @State private var tiles:Int = 0
  
   
   var body: some View {
@@ -63,24 +67,6 @@ struct ContentView: View {
     return VStack {
       //      ScrollView(Axis.Set.horizontal, showsIndicators: true) {
       VStack {
-        HStack {
-          Button(action: {
-            withAnimation {
-              self.fudge += 100
-            }
-          }) {
-            Text("Left")
-          }
-          
-          Button(action: {
-            withAnimation {
-              self.fudge -= 100
-            }
-          }) {
-            Text("Right")
-          }
-        }.offset(CGSize(width: -self.fudge, height: 0))
-        
         VStack {
           ZStack {
             Rectangle()
@@ -98,8 +84,9 @@ struct ContentView: View {
         }
         HStack {
 //          ForEach((0 ..< 68), id: \.self) { column in
-          ForEach((0 ..< 26), id: \.self) { column in
+          ForEach((0 ..< 25), id: \.self) { column in
             DominoWrapper(novelleViews: self.novelleViews, column: column, spin: 0, rect: self.$rect)
+              .offset(self.novelleViews.nouViews[column].offset)
           }
           // ZStack {
           //            ForEach((6 ..< 67), id: \.self) { column in
@@ -120,10 +107,21 @@ struct ContentView: View {
           }
       ) // VStack
     }.onReceive(resetPublisher) { (_) in
-      for dominos in self.novelleViews.nouViews {
-        
-      }
+      self.novelleViews.nouViews = allocateImagesV()
+      
+      
+//      for view2D in 0..<self.novelleViews.nouViews.count {
+//        if self.novelleViews.nouViews[view2D].rect != nil {
+//
+//        let foo = self.novelleViews.nouViews[view2D].rect
+//        let bar = CGSize(width: 0, height: foo!.height)
+//        self.novelleViews.nouViews[view2D].offset = bar
+//        }
+//      }
+    }.onReceive(setTilesPublisher) { ( figure ) in
+      self.tiles = figure
     }
+    
   }
 }
 
@@ -148,6 +146,7 @@ struct DominoWrapper: View {
       Back(spin: -spin).onTapGesture {
         withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
           self.spin = 180
+          
         }
       }
       .rotation3DEffect(.degrees(spin), axis: (x: 0, y: 1, z: 0))
@@ -157,7 +156,8 @@ struct DominoWrapper: View {
       
       if self.spin > 179 {
         Domino(spin: $xpin, novelleViews: novelleViews, index: $column, flipper: $flipper)
-        .background(InsideView(rect: $rect))
+//        .background(InsideView(rect: $rect))
+          .background(InsideView(novelleViews: novelleViews, index: $column))
         .onAppear {
           withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
             self.xpin = 0
@@ -176,7 +176,6 @@ struct DominoWrapper: View {
                   self.rotateAngle = 0
                   self.flipper = 0
                 }
-                print("rotateAngle ",self.rotateAngle)
               }
               }
             )
@@ -191,12 +190,10 @@ struct DominoWrapper: View {
                   self.rotateAngle = 0
                   self.flipper = 0
                 }
-                print("rotateAngle ",self.rotateAngle)
               }
               }
         })
         .onReceive(rotateDominoPublisher, perform: { ( domino ) in
-                print("domino ",domino,self.$column.wrappedValue)
                 if domino == self.$column.wrappedValue {
                 withAnimation {
                 if self.rotateAngle < 360 {
@@ -206,7 +203,6 @@ struct DominoWrapper: View {
                   self.rotateAngle = 0
                   self.flipper = 0
                 }
-                print("rotateAngle ",self.rotateAngle)
               }
               }
         })
@@ -224,9 +220,14 @@ struct DominoWrapper: View {
         .onEnded { ( value ) in
           self.dragOffset = CGSize(width: value.translation.width + self.accumulated.width, height: value.translation.height + self.accumulated.height)
           self.accumulated = self.dragOffset
-          print("fuck ",self.column,self.novelleViews.nouViews[self.column].id, self.novelleViews.nouViews[self.column].highImage,self.novelleViews.nouViews[self.column].lowImage)
+//          print("fooBar ",self.column,self.novelleViews.nouViews[self.column].id, self.novelleViews.nouViews[self.column].highImage,self.novelleViews.nouViews[self.column].lowImage)
         }
-      )
+      ).onReceive(resetPublisher) { (_) in
+        self.dragOffset.width = CGFloat(0)
+        self.dragOffset.height = CGFloat(0)
+        self.accumulated = CGSize.zero
+        self.rotateAngle = 0
+      }
       // .scaleEffect(magnificationEffect, anchor: .center)
       //    .onLongPressGesture {
       //        withAnimation(Animation.easeInOut(duration: 1.0).delay(0)) {
@@ -237,6 +238,8 @@ struct DominoWrapper: View {
       //    .onChanged { value in
       //      self.magnificationEffect = value
       //    })
+    }.onAppear {
+      self.novelleViews.nouViews[self.column].rect = self.rect.last
     }
   }
 }
@@ -267,7 +270,9 @@ struct Domino: View {
               .onEnded({ (_) in
               rotateDominoPublisher.send(self.index)
             }
-          ))
+          )).onReceive(resetPublisher) { (_) in
+            self.flipper = 0
+          }
         
           
           Divider()
@@ -278,18 +283,17 @@ struct Domino: View {
             .padding(4)
             .rotationEffect(.degrees(flipper), anchor: .center)
             .onTapGesture(count: 2) {
-              print("poo")
               flipDominoPublisher.send((self.index, -90))
             }
             .gesture(LongPressGesture()
               .onEnded({ (_) in
                 rotateDominoPublisher.send(self.index)
-                
                 }
               )
           )
-          
-        }
+        }.onReceive(resetPublisher) { (_) in
+            self.flipper = 0
+          }
     ).overlay(RoundedRectangle(cornerRadius: 8)
       .stroke(lineWidth: 2))
       .accessibility(identifier: String(self.index))
@@ -323,9 +327,13 @@ struct Back: View {
 }
 
 var runOnce = true
+var index2D = 0
 
 struct InsideView: View {
-  @Binding var rect: [CGRect]
+//  @Binding var rect: [CGRect]
+  @ObservedObject var novelleViews:newViews
+  @Binding var index:Int
+  
   var body: some View {
       return VStack {
          GeometryReader { geometry in
@@ -333,7 +341,9 @@ struct InsideView: View {
             .fill(Color.clear)
             .onAppear {
               if runOnce {
-                self.rect.append(geometry.frame(in: .global))
+                self.novelleViews.nouViews[self.index].rect = geometry.frame(in: .global)
+//                self.rect.append(geometry.frame(in: .global))
+                
               }
           }
         }
@@ -361,7 +371,7 @@ func allocateImagesV() -> [newView] {
             secondaryImages.insert(String(format: "Image-%d",build))
 //      primaryImages.insert(String(format: "image_part_%03d",build))
 //      secondaryImages.insert(String(format: "image_part_%03d",build))
-      print(String(format: "image_part_%d",build))
+      
     }
     repeat {
       
@@ -397,7 +407,6 @@ func allocateImagesV() -> [newView] {
 }
 
 func allocateImages() -> [newView] {
-  print("allocate Images")
   var primaryImages:Set<String> = []
   var secondaryImages:Set<String> = []
   var tiles:Set<String> = []
